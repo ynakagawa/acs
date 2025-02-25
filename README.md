@@ -1,126 +1,50 @@
-# WKND
+# Use multiple repositories
 
-This is a project template for AEM-based applications. It is intended as a best-practice set of examples as well as a potential starting point to develop your own functionality.
+Learn how to manage multiple Git repositories when working with Cloud Manager.
 
-## Modules
+## Sync private Git repositories
 
-The main parts of the template are:
+Instead of directly working with Cloud Manager’s Git repository, customers can work with their own private Git repository or multiple own Git repositories. In these cases, set up an automated synchronization process to ensure that the Git repository in Cloud Manager is always kept up-to-date.
 
-* core: Java bundle containing all core functionality like OSGi services, listeners or schedulers, as well as component-related Java code such as servlets or request filters.
-* it.tests: Java based integration tests
-* ui.apps: contains the /apps (and /etc) parts of the project, ie JS&CSS clientlibs, components, and templates
-* ui.content: contains sample content using the components from the ui.apps
-* ui.config: contains runmode specific OSGi configs for the project
-* ui.frontend: an optional dedicated front-end build mechanism (Angular, React or general Webpack project)
-* ui.tests: Selenium based UI tests
-* all: a single content package that embeds all of the compiled modules (bundles and content packages) including any vendor dependencies
-* analyse: this module runs analysis on the project which provides additional validation for deploying into AEMaaCS
+Depending on where the customer’s Git repository is hosted, a GitHub action or a continuous integration solution like Jenkins could be used to set up the automation. With an automation in place, every push to a customer-owned Git repository can be automatically forwarded to Cloud Manager’s Git repository.
 
-## How to build
+While such an automation for a single customer-owned Git repository is straight forward, configuring it for multiple repositories requires an initial setup. The contents from multiple Git repositories must be mapped to different directories within the single Cloud Manager Git repository. Cloud Manager’s Git repository must be provisioned with a root Maven pom.xml, listing the different subprojects in the modules section.
 
-To build all the modules run in the project root directory the following command with Maven 3:
+The following is a sample pom.xml file for two customer-owned Git repositories.
 
-    mvn clean install
+The first project is put into the directory named project-a.
+The second project is put into the directory named project-b.
 
-To build all the modules and deploy the `all` package to a local instance of AEM, run in the project root directory the following command:
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="https://maven.apache.org/POM/4.0.0" xmlns:xsi="https://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://maven.apache.org/POM/4.0.0 https://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
 
-    mvn clean install -PautoInstallSinglePackage
+    <groupId>customer.group.id</groupId>
+    <artifactId>customer-reactor</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
 
-Or to deploy it to a publish instance, run
+    <modules>
+        <module>project-a</module>
+        <module>project-b</module>
+    </modules>
 
-    mvn clean install -PautoInstallSinglePackagePublish
+</project>
 
-Or alternatively
+Such a root pom.xml is pushed to a branch in Cloud Manager’s Git repository. Then, the two projects must be set up to forward changes automatically to Cloud Manager’s Git repository.
 
-    mvn clean install -PautoInstallSinglePackage -Daem.port=4503
+A possible solution would be the following.
 
-Or to deploy only the bundle to the author, run
+Trigger a GitHub action by pushing to a branch in project A.
+The action checks out project A and the Cloud Manager Git repository. Then it copies all contents of project A to the project-a directory in Cloud Manager’s Git repository.
+Then the action commits-pushes the change.
+For example, a change on the main branch in project A is automatically pushed to the main branch in Cloud Manager’s Git repository. There could be a mapping between branches like a push to a branch named dev in project A is pushed to a branch named development in Cloud Manager’s Git repository. Similar steps are required for project B.
 
-    mvn clean install -PautoInstallBundle
+Depending on the branching strategy and workflows, the syncing can be configured for different branches. If the used Git repository does not provide a concept similar to GitHub actions, an integration by way of Jenkins (or similar) is possible as well. In this case, a webhook triggers a Jenkins job, which does the work.
 
-Or to deploy only a single content package, run in the sub-module directory (i.e `ui.apps`)
+Follow these steps so you can add a new, third source or repository.
 
-    mvn clean install -PautoInstallPackage
-
-## Testing
-
-There are three levels of testing contained in the project:
-
-### Unit tests
-
-This show-cases classic unit testing of the code contained in the bundle. To
-test, execute:
-
-    mvn clean test
-
-### Integration tests
-
-This allows running integration tests that exercise the capabilities of AEM via
-HTTP calls to its API. To run the integration tests, run:
-
-    mvn clean verify -Plocal
-
-Test classes must be saved in the `src/main/java` directory (or any of its
-subdirectories), and must be contained in files matching the pattern `*IT.java`.
-
-The configuration provides sensible defaults for a typical local installation of
-AEM. If you want to point the integration tests to different AEM author and
-publish instances, you can use the following system properties via Maven's `-D`
-flag.
-
-| Property | Description | Default value |
-| --- | --- | --- |
-| `it.author.url` | URL of the author instance | `http://localhost:4502` |
-| `it.author.user` | Admin user for the author instance | `admin` |
-| `it.author.password` | Password of the admin user for the author instance | `admin` |
-| `it.publish.url` | URL of the publish instance | `http://localhost:4503` |
-| `it.publish.user` | Admin user for the publish instance | `admin` |
-| `it.publish.password` | Password of the admin user for the publish instance | `admin` |
-
-The integration tests in this archetype use the [AEM Testing
-Clients](https://github.com/adobe/aem-testing-clients) and showcase some
-recommended [best
-practices](https://github.com/adobe/aem-testing-clients/wiki/Best-practices) to
-be put in use when writing integration tests for AEM.
-
-## Static Analysis
-
-The `analyse` module performs static analysis on the project for deploying into AEMaaCS. It is automatically
-run when executing
-
-    mvn clean install
-
-from the project root directory. Additional information about this analysis and how to further configure it
-can be found here https://github.com/adobe/aemanalyser-maven-plugin
-
-### UI tests
-
-They will test the UI layer of your AEM application using Selenium technology. 
-
-To run them locally:
-
-    mvn clean verify -Pui-tests-local-execution
-
-This default command requires:
-* an AEM author instance available at http://localhost:4502 (with the whole project built and deployed on it, see `How to build` section above)
-* Chrome browser installed at default location
-
-Check README file in `ui.tests` module for more details.
-
-## ClientLibs
-
-The frontend module is made available using an [AEM ClientLib](https://helpx.adobe.com/experience-manager/6-5/sites/developing/using/clientlibs.html). When executing the NPM build script, the app is built and the [`aem-clientlib-generator`](https://github.com/wcm-io-frontend/aem-clientlib-generator) package takes the resulting build output and transforms it into such a ClientLib.
-
-A ClientLib will consist of the following files and directories:
-
-- `css/`: CSS files which can be requested in the HTML
-- `css.txt` (tells AEM the order and names of files in `css/` so they can be merged)
-- `js/`: JavaScript files which can be requested in the HTML
-- `js.txt` (tells AEM the order and names of files in `js/` so they can be merged
-- `resources/`: Source maps, non-entrypoint code chunks (resulting from code splitting), static assets (e.g. icons), etc.
-
-## Maven settings
-
-The project comes with the auto-public repository configured. To setup the repository in your Maven settings, refer to:
-
-    http://helpx.adobe.com/experience-manager/kb/SetUpTheAdobeMavenRepository.html
+Add a GitHub action to the new repository, which pushes changes from that repository to Cloud Manager’s Git repository.
+Perform that action at least once to ensure that project code is in Cloud Manager’s Git repository.
+In the Cloud Manager Git repository, add a reference to the new directory in the root Maven pom.xml.
